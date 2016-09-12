@@ -1,25 +1,226 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research - Project 1"
+author: "Stanley Chan"
+date: "September 12, 2016"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
+## Research Introduction
 
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the "quantified self" movement -- a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
 
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
 
-## What is mean total number of steps taken per day?
+## Data
 
+The data for this assignment can be downloaded from the course web site:  
+**Dataset:** [Activity monitoring data[52K]](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)
 
+The variables included in this dataset are:  
+**steps:** Number of steps taking in a 5-minute interval (missing values are coded as NA)  
+**date:** The date on which the measurement was taken in YYYY-MM-DD format  
+**interval:** Identifier for the 5-minute interval in which measurement was taken
 
-## What is the average daily activity pattern?
+The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
 
+## Project Assignment
 
+###Loading and preprocessing the data
 
-## Imputing missing values
+To prepare the data for analysis, we need to perform the following:-  
+1. Create and set working directory.  
+2. Download the data from data source.  
+3. Uzip the zip file.   
+4. Load the data into a dataset.  
+5. Perform some basic data clean up.
 
+```{r}
+## Create and Set Working Directory
+workingfolder <- "~/exploratory_data/project1"
 
+if (dir.exists(workingfolder)){
+    setwd(workingfolder)
+} else {
+    dir.create("~/exploratory_data")
+    dir.create("~/exploratory_data/project1")
+    setwd(workingfolder)
 
-## Are there differences in activity patterns between weekdays and weekends?
+}
+
+##Download the source datafile
+fileurl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+if (!file.exists("repdata%2Fdata%2Factivity.zip")) {
+		download.file(fileurl, "./repdata%2Fdata%2Factivity.zip")
+}
+
+##Unzip file
+if (!file.exists("activity.csv")) {
+		unzip("./repdata%2Fdata%2Factivity.zip") 
+}
+
+##Load from file to dataset
+alldata <- read.csv("./activity.csv", na.strings="NA")
+
+##Convert date to date format 
+alldata$date <- as.Date(alldata$date)
+
+str(alldata)
+
+```
+Now the data is ready for analysis.  
+
+###Question 1 : What is mean total number of steps taken per day?
+What we are trying to solved is to understand the mean total number of steps taken per day. How we calculate the total number of steps taken per day is by grouping and sum all the steps based on the date (each day).
+
+```{r}
+steps.day <- tapply(alldata$steps, alldata$date, sum)
+head(steps.day)
+```
+
+Plot the histogram using `hist` with `steps.day` dataset
+
+```{r}
+hist (steps.day, 
+    main = "Histogram Of Total Steps Per Day",
+    xlab = "Range of step totals"
+)
+```
+
+**Mean of the total number of steps per day**
+```{r}
+mean(steps.day[complete.cases(steps.day)])
+```
+**Median of the total number of steps per day**
+```{r}
+median(steps.day[complete.cases(steps.day)])
+```   
+
+###Question 2 : What is the average daily activity pattern?   
+
+What we are trying to solved is to make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis).
+
+To calculate the average number of steps taken per Interval, we need to group and average out all the steps based on the Interval.
+
+```{r}
+avg.steps.interval <- tapply(alldata$steps, alldata$interval ,mean, na.rm=TRUE)
+
+##Convert to dataframe
+df.asi <- data.frame(interval=as.integer(names(avg.steps.interval)), average=avg.steps.interval)
+head(df.asi)
+```
+
+Plot the line graph using `plot` and set the plot type to "l" with `df.asi` dataset
+
+```{r}
+plot(df.asi,
+     type="l",
+     xlab="Time intervals (5 minutes)",
+     ylab="Average of Total Steps",
+     main="Time Series Plot : Average of Total Steps in a Day")
+```
+**Max Interval Average Steps** 
+```{r}
+avg.steps.interval.max <- max(avg.steps.interval)
+print(avg.steps.interval.max)
+```
+**5-minute interval that contain the Max Interval Average Steps** 
+```{r}
+df.asi[df.asi$average == avg.steps.interval.max,1]
+```   
+###Question 3 : Imputing missing values   
+We need to take note that there are a number of days/intervals where there are missing values (coded as NA). The presence of missing days may introduce bias into some calculations or summaries of the data.
+
+first, We need to calculate the total number of data with missing value "NA" in our dataset.
+
+**Total Missing Values with NA** 
+```{r}
+sum(is.na(alldata))  
+```
+
+To imputing missing values, We will need to include all the missing data values into our origin dataset `alldata` with imputing value from mean for that 5-minute interval.
+
+```{r}
+steps.day.na <- alldata[is.na(alldata),]
+steps.day.complete <- alldata[complete.cases(alldata),]
+##Injecting missing values with mean interval
+steps.day.na$steps <- as.numeric(avg.steps.interval)
+steps.day.allvalues <- rbind(steps.day.na,steps.day.complete)
+
+str(steps.day.allvalues)
+```
+
+Recreate the new dataset with imputing data
+
+```{r}
+imputing.steps.day <- tapply(steps.day.allvalues$steps,steps.day.allvalues$date,sum)
+
+```
+
+Plot the histogram using `hist` with `imputing.steps.day` dataset
+
+```{r}
+hist (imputing.steps.day, 
+    main = "Histogram Of Total Steps Per Day",
+    xlab = "Range of step totals"
+)
+
+```  
+
+**Mean of the total number of steps per day**
+
+```{r}
+mean(imputing.steps.day)
+```  
+
+**Median of the total number of steps per day**
+
+```{r}
+median(imputing.steps.day)
+```   
+###Question 4 : Are there differences in activity patterns between weekdays and weekends?
+
+What we are trying to solved is to understand the differences activity patterns between weekdays and weekends.
+
+First, we need to subset the data for weekdays and weekends and combine into a new dataset.
+
+We need to restructure the data using `reshape2` to enable us to plot the data based on interval, day and steps.
+
+```{r}
+alldata$weekday <- weekdays(alldata$date)
+
+for (i in 1:nrow(alldata)) {
+          if (alldata$weekday[i] == "Saturday" || alldata$weekday[i] == "Sunday"){
+            alldata$weekday[i] <- "weekend"}
+          else {
+            alldata$weekday[i] <- "weekday"}
+         }
+weekday.steps <- subset(alldata, alldata$weekday =="weekday")
+weekend.steps <- subset(alldata, alldata$weekday =="weekend")
+alldata.steps.day <- rbind(weekday.steps, weekend.steps)
+
+steps.interval.avg <- tapply(alldata.steps.day$steps,list(alldata.steps.day$interval,alldata.steps.day$weekday),mean,na.rm=TRUE)
+
+library(reshape2)
+steps.interval.avg <- melt(steps.interval.avg)
+colnames(steps.interval.avg) <- c("interval","day","steps")
+
+head(steps.interval.avg)
+```
+
+Plot the graph using `xyplot` with `steps.interval.avg` dataset
+
+```{r}
+library(lattice)
+xyplot(steps.interval.avg$steps ~ steps.interval.avg$interval | steps.interval.avg$day,
+      layout=c(1,2),
+      type="l",
+      main="Time Series Plot of the Average of Total Steps for Weekday and Weekend",
+      xlab="Time intervals (5 minutes)",
+      ylab="Average of Total Steps"
+      )
+
+```
